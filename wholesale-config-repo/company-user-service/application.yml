@@ -1,0 +1,16 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: company-user-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/company_user_db
+    username: root
+    password: rootpassword
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh
