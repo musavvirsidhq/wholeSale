@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  # MySQL Databases
+  mysql-auth:
+    image: mysql:8.0
+    container_name: mysql-auth
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: auth_db
+      MYSQL_USER: auth_user
+      MYSQL_PASSWORD: auth_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - auth_db_data:/var/lib/mysql
+    networks:
+      - wholesale-network
+
+  mysql-company:
+    image: mysql:8.0
+    container_name: mysql-company
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: company_user_db
+      MYSQL_USER: company_user
+      MYSQL_PASSWORD: company_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - company_db_data:/var/lib/mysql
+    networks:
+      - wholesale-network
+
+  mysql-product:
+    image: mysql:8.0
+    container_name: mysql-product
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: product_db
+      MYSQL_USER: product_user
+      MYSQL_PASSWORD: product_password
+    ports:
+      - "3308:3306"
+    volumes:
+      - product_db_data:/var/lib/mysql
+    networks:
+      - wholesale-network
+
+  # Config Server
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - wholesale-network
+
+  # Discovery Service
+  discovery-service:
+    build: ./discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      - config-server
+    networks:
+      - wholesale-network
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - EUREKA_SERVER_URL=http://discovery-service:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-auth:3306/auth_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql-auth
+      - discovery-service
+      - config-server
+    networks:
+      - wholesale-network
+
+  # Company-User Service
+  company-user-service:
+    build: ./company-user-service
+    container_name: company-user-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - EUREKA_SERVER_URL=http://discovery-service:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-company:3306/company_user_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+    depends_on:
+      - mysql-company
+      - discovery-service
+      - config-server
+    networks:
+      - wholesale-network
+
+  # Gateway Service
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - EUREKA_SERVER_URL=http://discovery-service:8761/eureka/
+    depends_on:
+      - discovery-service
+      - config-server
+      - auth-service
+      - company-user-service
+    networks:
+      - wholesale-network
+
+volumes:
+  auth_db_data:
+  company_db_data:
+  product_db_data:
+
+networks:
+  wholesale-network:
+    driver: bridge
