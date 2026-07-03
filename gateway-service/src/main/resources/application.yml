@@ -1,0 +1,130 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    config:
+      uri: http://localhost:8888
+      fail-fast: true
+      username: configadmin
+      password: configpassword
+    gateway:
+      routes:
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: authService
+                fallbackUri: forward:/fallback/auth
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+
+        - id: company-user-service
+          uri: lb://COMPANY-USER-SERVICE
+          predicates:
+            - Path=/api/companies/**,/api/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: companyUserService
+                fallbackUri: forward:/fallback/company
+            - AuthenticationFilter
+
+        - id: product-service
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/products/**,/api/categories/**,/api/subcategories/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: productService
+                fallbackUri: forward:/fallback/product
+            - AuthenticationFilter
+
+        - id: purchase-service
+          uri: lb://PURCHASE-SERVICE
+          predicates:
+            - Path=/api/purchases/**,/api/suppliers/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: purchaseService
+                fallbackUri: forward:/fallback/purchase
+            - AuthenticationFilter
+
+        - id: sale-service
+          uri: lb://SALE-SERVICE
+          predicates:
+            - Path=/api/sales/**,/api/retailers/**,/api/cart/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: saleService
+                fallbackUri: forward:/fallback/sale
+            - AuthenticationFilter
+
+        - id: payment-service
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/payments/**,/api/reports/**,/api/dashboard/**,/api/bills/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: paymentService
+                fallbackUri: forward:/fallback/payment
+            - AuthenticationFilter
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka:eurekapassword@localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      authService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+      companyUserService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+      productService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+      purchaseService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+      saleService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+      paymentService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway.
